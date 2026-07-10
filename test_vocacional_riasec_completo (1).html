@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Vocacional Institucional - U.E. Néstor Mogollón</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <style>
+        :root { --burgundy: #8B1D25; --cream: #FDFBF7; --gold: #EAB308; }
+        body { background-color: var(--cream); font-family: 'Segoe UI', sans-serif; }
+        .sticky-scale { position: sticky; top: 0; z-index: 50; background: white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        
+        /* Ocultar input de radio nativo y dar estilo al label */
+        input[type="radio"] { display: none; }
+        .radio-label {
+            display: flex; flex-direction: column; items: center; justify-content: center;
+            width: 100%; padding: 8px 4px; border: 1px solid #e5e7eb; border-radius: 0.5rem;
+            cursor: pointer; transition: all 0.2s; background: white;
+        }
+        input[type="radio"]:checked + .radio-label {
+            background-color: var(--gold); border-color: var(--burgundy); color: var(--burgundy); font-weight: bold;
+        }
+
+        @media print {
+            body { background-color: white; font-size: 10pt; margin: 0; padding: 10px; }
+            .no-print { display: none !important; }
+            .sticky-scale { display: none !important; }
+            #app { max-width: 100% !important; border: none !important; box-shadow: none !important; margin: 0 !important; padding: 0 !important; }
+            .chart-container { max-height: 250px !important; }
+        }
+    </style>
+</head>
+<body class="p-4">
+    <div id="app" class="max-w-4xl mx-auto bg-white p-6 md:p-8 rounded-2xl shadow-xl border-t-8 border-[#8B1D25]">
+        
+        <!-- ENCABEZADO -->
+        <div class="text-center mb-6 no-print">
+            <h1 class="text-2xl font-bold text-[#8B1D25]">Unidad Educativa "Néstor Mogollón"</h1>
+            <p class="text-sm text-gray-600 mt-1">Instrumento de Orientación Vocacional - Modelo RIASEC</p>
+        </div>
+
+        <!-- PANTALLA DE INICIO -->
+        <div id="login-screen">
+            <div class="bg-gray-50 p-5 rounded-xl border border-gray-200 mb-6 text-sm">
+                <h3 class="font-bold text-[#8B1D25] mb-2 text-base">Instrucciones Importantes</h3>
+                <p class="mb-3">Este instrumento mide tus <strong>intereses</strong>, no tus conocimientos previos. Responde con sinceridad basándote en lo que te <em>gustaría</em> hacer, no en lo que ya sabes hacer.</p>
+                <p class="text-gray-600 mb-4 text-xs italic">Escala de valoración:</p>
+                <div class="grid grid-cols-5 gap-2 text-center text-xs font-medium text-gray-700">
+                    <div class="bg-white p-2 rounded shadow-sm border border-gray-100">1<br><span class="text-[10px]">Nada</span></div>
+                    <div class="bg-white p-2 rounded shadow-sm border border-gray-100">2<br><span class="text-[10px]">Poco</span></div>
+                    <div class="bg-white p-2 rounded shadow-sm border border-gray-100">3<br><span class="text-[10px]">Neutral</span></div>
+                    <div class="bg-white p-2 rounded shadow-sm border border-gray-100">4<br><span class="text-[10px]">Bastante</span></div>
+                    <div class="bg-white p-2 rounded shadow-sm border border-gray-100 border-[#EAB308]">5<br><span class="text-[10px] text-[#8B1D25]">Totalmente</span></div>
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-bold text-gray-700 mb-1">Nombre y Apellido del Estudiante:</label>
+                <input type="text" id="username" placeholder="Ej. Juan Pérez" class="w-full p-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-[#8B1D25] transition">
+            </div>
+            <button onclick="startTest()" class="w-full bg-[#8B1D25] text-white py-3 rounded-xl font-bold hover:bg-red-900 transition text-lg shadow-md">Comenzar Evaluación</button>
+        </div>
+
+        <!-- PANTALLA DEL TEST -->
+        <div id="quiz-screen" class="hidden">
+            <div class="sticky-scale p-3 mb-4 rounded-b-xl border-b-4 border-[#EAB308]">
+                <div class="grid grid-cols-5 gap-1 text-center font-bold text-[#8B1D25]">
+                    <div class="text-xs">1<br><span class="font-normal text-[9px] md:text-[10px]">Nada</span></div>
+                    <div class="text-xs">2<br><span class="font-normal text-[9px] md:text-[10px]">Poco</span></div>
+                    <div class="text-xs">3<br><span class="font-normal text-[9px] md:text-[10px]">Neutral</span></div>
+                    <div class="text-xs">4<br><span class="font-normal text-[9px] md:text-[10px]">Bastante</span></div>
+                    <div class="text-xs">5<br><span class="font-normal text-[9px] md:text-[10px]">Totalmente</span></div>
+                </div>
+            </div>
+            <div id="questions-form" class="space-y-3"></div>
+            <button onclick="calculateResults()" class="w-full mt-8 bg-[#EAB308] text-[#8B1D25] py-4 rounded-xl font-bold hover:bg-yellow-500 transition shadow-lg text-lg">Finalizar y Analizar Perfil</button>
+        </div>
+
+        <!-- PANTALLA DE RESULTADOS -->
+        <div id="result-screen" class="hidden">
+            <div class="border-b-2 border-[#8B1D25] pb-2 mb-4 flex justify-between items-end">
+                <div>
+                    <h1 class="text-2xl font-bold text-[#8B1D25]">Reporte de Orientación Vocacional</h1>
+                    <p id="report-meta" class="text-xs text-gray-600 font-medium mt-1"></p>
+                </div>
+                <div class="text-right no-print">
+                    <span id="time-taken" class="inline-block bg-gray-100 text-gray-600 text-[10px] px-2 py-1 rounded-md border"></span>
+                </div>
+            </div>
+
+            <!-- Bloque Explicativo General (La nueva narrativa) -->
+            <div class="bg-[#FDFBF7] p-4 rounded-xl border border-[#EAB308] mb-6 text-sm text-gray-800 leading-relaxed shadow-sm">
+                <h3 class="font-bold text-[#8B1D25] mb-2">Entendiendo tu Perfil Vocacional</h3>
+                <p class="mb-2">Es importante que sepas que este reporte no te clasifica en una sola categoría. Según la Teoría de Holland, todos poseemos en mayor o menor medida rasgos de las seis tipologías. Tu resultado no es una etiqueta definitiva, sino un <strong>mapa de tus intereses actuales</strong>.</p>
+                <p>El porcentaje que ves en cada área indica tu grado de afinidad con ese estilo de vida y trabajo. Observando las tres dimensiones con mayor puntuación (tu <strong>Código Holland</strong>), identificamos el ambiente donde probablemente te sentirás más satisfecho y capaz de alcanzar logros.</p>
+            </div>
+
+            <div class="flex flex-col md:flex-row gap-6 mb-6">
+                <!-- Gráfico -->
+                <div class="w-full md:w-1/3 flex flex-col items-center justify-center bg-gray-50 p-4 rounded-xl border">
+                    <h4 class="font-bold text-gray-700 text-xs mb-2">Distribución de Intereses</h4>
+                    <div class="chart-container relative w-full aspect-square max-w-[250px]">
+                        <canvas id="resultChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Análisis Específico -->
+                <div class="w-full md:w-2/3 flex flex-col justify-center">
+                    <div id="holland-code-display" class="mb-4"></div>
+                    <div id="recommendation-box" class="p-4 rounded-xl border-l-4 mb-4 text-sm"></div>
+                    <div id="analysis-content" class="text-xs text-gray-700 text-justify leading-relaxed"></div>
+                </div>
+            </div>
+
+            <!-- Detalle técnico para el DECE -->
+            <div class="mt-6 border-t pt-4">
+                <h4 class="font-bold text-[#8B1D25] text-xs mb-2">Detalle Técnico para el DECE (Respuestas en Bruto)</h4>
+                <div id="detailed-responses" class="grid grid-cols-10 gap-1 text-[9px]"></div>
+            </div>
+
+            <div class="no-print mt-8 flex gap-4">
+                <button onclick="triggerPrint()" class="flex-1 bg-[#8B1D25] text-white py-3 rounded-xl font-bold hover:bg-red-900 transition shadow">Guardar / Imprimir PDF</button>
+                <button onclick="location.reload()" class="flex-1 bg-gray-200 text-gray-800 py-3 rounded-xl font-bold hover:bg-gray-300 transition shadow">Nuevo Test</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Textos descriptivos por dimensión (Enfocados en potencial e intereses)
+        const ANALYSIS_DB = {
+            R: "El perfil Realista (R) destaca por su orientación práctica. Sientes afinidad por actividades donde puedes ver resultados tangibles y concretos. Disfrutas el movimiento, el uso de herramientas y la manipulación de objetos físicos. Tienes un gran potencial para entender el funcionamiento mecánico e informático de las cosas.",
+            I: "El perfil Investigador (I) representa la curiosidad intelectual. Sientes inclinación hacia el análisis lógico, la resolución de problemas teóricos y la búsqueda del porqué de las cosas. Este perfil es ideal para investigar, recopilar datos y formular soluciones complejas mediante el pensamiento crítico.",
+            A: "El perfil Artístico (A) se caracteriza por la necesidad de crear, innovar y expresar ideas originales. Valoras la libertad creativa, la estética y la comunicación visual o escrita. Tu afinidad sugiere que aportas perspectivas únicas e innovación a cualquier proyecto en el que te involucres.",
+            S: "El perfil Social (S) es el motor de los entornos colaborativos. Tienes una clara vocación hacia el servicio, la empatía y la comunicación interpersonal. Te motiva apoyar a los demás, explicar procesos y trabajar en equipo, lo cual es invaluable tanto en ciencias puras como en liderazgo técnico.",
+            E: "El perfil Emprendedor (E) muestra una mentalidad orientada a objetivos, el liderazgo y la influencia. Te atrae organizar recursos, tomar la iniciativa en proyectos y convencer a otros sobre una idea. Tienes el potencial de ver el 'cuadro completo' y dirigir iniciativas hacia el éxito.",
+            C: "El perfil Convencional (C) es el pilar del orden y la estructura. Tienes afinidad por procesos claros, el cumplimiento de protocolos y la precisión en el manejo de datos. Esta habilidad es crítica para la administración de sistemas, la documentación técnica y la garantía de calidad operativa."
+        };
+
+        // LAS 30 PREGUNTAS VALIDADAS (5 por cada dimensión, enfocadas en interés)
+        const QUESTIONS = [
+            // REALISTA (R)
+            { id: 1, type: 'R', text: "Prefiero actividades donde pueda manipular objetos físicos y armar cosas." },
+            { id: 2, type: 'R', text: "Me resulta gratificante entender cómo funcionan las cosas en el mundo físico." },
+            { id: 3, type: 'R', text: "Disfruto el trabajo práctico donde puedo ver resultados inmediatos y tangibles." },
+            { id: 4, type: 'R', text: "Me gustaría un trabajo que implique moverme y estar activo, en lugar de estar sentado siempre." },
+            { id: 5, type: 'R', text: "Me atrae la idea de utilizar herramientas o equipos técnicos para construir o reparar algo." },
+            // INVESTIGADOR (I)
+            { id: 6, type: 'I', text: "Prefiero analizar problemas complejos buscando explicaciones lógicas o teóricas." },
+            { id: 7, type: 'I', text: "Me fascina investigar y leer sobre nuevos descubrimientos científicos o tecnológicos." },
+            { id: 8, type: 'I', text: "Disfruto mucho resolviendo acertijos lógicos o problemas matemáticos." },
+            { id: 9, type: 'I', text: "Me gusta observar detenidamente una situación para entender por qué ocurre." },
+            { id: 10, type: 'I', text: "Me atrae la idea de trabajar en un laboratorio o centro de investigación analizando datos." },
+            // ARTÍSTICO (A)
+            { id: 11, type: 'A', text: "Disfruto cuando tengo libertad para expresar ideas de forma creativa y original." },
+            { id: 12, type: 'A', text: "Valoro mucho que las cosas tengan un buen diseño y sean visualmente atractivas." },
+            { id: 13, type: 'A', text: "Prefiero actividades donde pueda imponer mi propio estilo en lugar de seguir reglas estrictas." },
+            { id: 14, type: 'A', text: "Me divierte imaginar historias, diseñar gráficos o crear contenido audiovisual." },
+            { id: 15, type: 'A', text: "Me siento atraído por actividades relacionadas con el arte, el diseño, la música o la literatura." },
+            // SOCIAL (S)
+            { id: 16, type: 'S', text: "Me motiva mucho participar en actividades que ayudan directamente a otras personas." },
+            { id: 17, type: 'S', text: "Tengo paciencia y disfruto explicando cosas a quienes tienen dificultades para entender." },
+            { id: 18, type: 'S', text: "Prefiero trabajar en equipo, colaborando y escuchando las ideas de mis compañeros." },
+            { id: 19, type: 'S', text: "Me siento satisfecho cuando logro mediar en un conflicto y lograr que las personas se entiendan." },
+            { id: 20, type: 'S', text: "Me interesan los temas relacionados con el bienestar emocional, la salud y el desarrollo humano." },
+            // EMPRENDEDOR (E)
+            { id: 21, type: 'E', text: "Me atraen los proyectos donde puedo tomar la iniciativa y liderar a un grupo." },
+            { id: 22, type: 'E', text: "Disfruto asumiendo retos donde tengo que convencer o persuadir a otros sobre una idea." },
+            { id: 23, type: 'E', text: "Me motiva establecer metas ambiciosas y organizar los recursos para alcanzarlas." },
+            { id: 24, type: 'E', text: "Me siento cómodo tomando decisiones importantes, incluso en situaciones de presión." },
+            { id: 25, type: 'E', text: "Me interesa entender cómo funcionan los negocios y cómo se pueden mejorar los procesos." },
+            // CONVENCIONAL (C)
+            { id: 26, type: 'C', text: "Me siento cómodo cuando trabajo siguiendo procesos ordenados, reglas y protocolos claros." },
+            { id: 27, type: 'C', text: "Disfruto organizando información, clasificando datos o manteniendo archivos en orden." },
+            { id: 28, type: 'C', text: "Prefiero realizar tareas que tienen instrucciones paso a paso muy bien definidas." },
+            { id: 29, type: 'C', text: "Soy una persona meticulosa que presta mucha atención a los detalles para evitar errores." },
+            { id: 30, type: 'C', text: "Me atrae el trabajo administrativo, la gestión de documentos o el control de calidad." }
+        ];
+
+        let state = { startTime: null, user: '', answers: {} };
+
+        function startTest() {
+            const name = document.getElementById('username').value.trim();
+            if(!name) { 
+                alert("Por favor, ingresa tu nombre y apellido para comenzar."); 
+                document.getElementById('username').focus();
+                return; 
+            }
+            state.user = name;
+            state.startTime = new Date(); // Iniciar temporizador
+            
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('quiz-screen').classList.remove('hidden');
+            
+            const form = document.getElementById('questions-form');
+            form.innerHTML = ''; // Limpiar por si acaso
+            
+            QUESTIONS.forEach((q) => {
+                const div = document.createElement('div');
+                div.id = `q-${q.id}`;
+                div.className = "bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition";
+                
+                let optionsHTML = '';
+                [1, 2, 3, 4, 5].forEach(n => {
+                    optionsHTML += `
+                        <div class="flex-1">
+                            <label class="relative w-full h-full">
+                                <input type="radio" name="q${q.id}" value="${n}">
+                                <div class="radio-label text-xs md:text-sm text-center">
+                                    <span class="block">${n}</span>
+                                </div>
+                            </label>
+                        </div>
+                    `;
+                });
+
+                div.innerHTML = `
+                    <p class="text-sm md:text-base font-medium text-gray-800 mb-3">${q.id}. ${q.text}</p>
+                    <div class="flex gap-2 justify-between w-full">
+                        ${optionsHTML}
+                    </div>
+                `;
+                form.appendChild(div);
+            });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function calculateResults() {
+            const missing = [];
+            state.answers = {};
+            
+            QUESTIONS.forEach(q => { 
+                const selected = document.querySelector(`input[name="q${q.id}"]:checked`); 
+                if (!selected) missing.push(q.id); 
+                else state.answers[q.id] = parseInt(selected.value); 
+            });
+            
+            if (missing.length > 0) { 
+                alert("Te faltan responder algunas preguntas. La primera pendiente es la número " + missing[0]); 
+                document.getElementById(`q-${missing[0]}`).scrollIntoView({ behavior: 'smooth', block: 'center' }); 
+                return; 
+            }
+
+            // Calcular tiempo
+            const endTime = new Date();
+            const durationSeconds = Math.floor((endTime - state.startTime) / 1000);
+            const minutes = Math.floor(durationSeconds / 60);
+            const seconds = durationSeconds % 60;
+            const timeString = `${minutes} min ${seconds} seg`;
+
+            // Calcular puntajes por dimensión (Máximo 25 por dimensión)
+            const scores = { R:0, I:0, A:0, S:0, E:0, C:0 };
+            QUESTIONS.forEach(q => { scores[q.type] += state.answers[q.id]; });
+            
+            showResults(scores, timeString, durationSeconds);
+        }
+
+        function showResults(scores, timeString, durationSeconds) {
+            document.getElementById('quiz-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            // Ordenar de mayor a menor
+            const sorted = Object.entries(scores).sort((a,b) => b[1] - a[1]);
+            const totalScore = Object.values(scores).reduce((acc, val) => acc + val, 0);
+            
+            // Obtener las 3 letras predominantes
+            const top3 = sorted.slice(0, 3);
+            const hollandCode = top3.map(x => x[0]).join('');
+            
+            // Textos y Metadata
+            const dateStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute:'2-digit' });
+            document.getElementById('report-meta').innerText = `Estudiante: ${state.user.toUpperCase()} | Fecha: ${dateStr}`;
+            
+            // Indicador de tiempo y advertencia si es muy rápido (menos de 1 minuto para 30 preguntas)
+            let timeHTML = `Tiempo: ${timeString}`;
+            if(durationSeconds < 60) {
+                timeHTML += ` <span class="text-red-500 font-bold" title="Tiempo de respuesta inusualmente rápido. Validar con DECE.">⚠️ (Rápido)</span>`;
+            }
+            document.getElementById('time-taken').innerHTML = timeHTML;
+
+            // Renderizar Código Holland
+            document.getElementById('holland-code-display').innerHTML = `
+                <div class="flex items-center gap-3">
+                    <span class="text-gray-600 text-sm font-bold uppercase tracking-wider">Tu Código Holland:</span>
+                    <span class="text-3xl font-extrabold tracking-widest text-[#8B1D25] bg-[#EAB308] bg-opacity-30 px-3 py-1 rounded-lg border border-[#EAB308]">${hollandCode}</span>
+                </div>
+            `;
+
+            // Lógica de Recomendación Orientativa Institucional
+            const hasTechnical = ['R', 'C', 'E'].some(letter => hollandCode.includes(letter));
+            const hasScience = ['I', 'A', 'S'].some(letter => hollandCode.includes(letter));
+            
+            let recommendationText = "";
+            let bgColor = "bg-gray-50";
+            let borderColor = "border-gray-400";
+
+            if (['R', 'C'].includes(top3[0][0])) {
+                // Fuerte inclinación técnica
+                recommendationText = `Tus intereses predominantes (${top3[0][0]} y ${top3[1][0]}) muestran una fuerte compatibilidad con actividades estructuradas, técnicas y pragmáticas. En la oferta de nuestra institución, este perfil se alinea naturalmente con el <strong>Bachillerato Técnico en Soporte Informático</strong>.`;
+                bgColor = "bg-blue-50"; borderColor = "border-blue-400";
+            } else if (['I', 'S'].includes(top3[0][0])) {
+                 // Fuerte inclinación ciencias
+                recommendationText = `Tus intereses predominantes (${top3[0][0]} y ${top3[1][0]}) reflejan una fuerte inclinación hacia la investigación, el análisis teórico y el factor humano. En nuestra oferta educativa, estas cualidades son pilares fundamentales para el éxito en el <strong>Bachillerato en Ciencias</strong>.`;
+                bgColor = "bg-green-50"; borderColor = "border-green-400";
+            } else {
+                // Perfil equilibrado o cruzado (Ej. A, E como principales)
+                recommendationText = `Tu perfil es muy versátil. Tu código ${hollandCode} indica que posees creatividad, liderazgo y capacidad de adaptación. Estas habilidades te permitirían destacar <strong>en cualquiera de los dos bachilleratos</strong> (Técnico o Ciencias). Se sugiere dialogar con el DECE para evaluar qué habilidades específicas deseas potenciar.`;
+                bgColor = "bg-yellow-50"; borderColor = "border-[#EAB308]";
+            }
+
+            // Advertencia de Diferenciación (Confianza)
+            const diff = top3[0][1] - sorted[5][1]; // Diferencia entre el más alto y el más bajo
+            if (diff < 5) {
+                recommendationText += `<br><br><span class="text-xs text-[#8B1D25] font-bold">Nota Técnica:</span> Presentas un perfil muy equilibrado (puntajes similares en todas las áreas). Esto es normal en etapa de exploración. Toma esta sugerencia solo como un punto de partida.`;
+            }
+
+            document.getElementById('recommendation-box').className = `p-4 rounded-xl border-l-4 mb-4 text-sm ${bgColor} ${borderColor}`;
+            document.getElementById('recommendation-box').innerHTML = recommendationText;
+
+            // Análisis de las dimensiones predominantes
+            let analysisHTML = `<p class="font-bold mb-2">Desglose de tus principales intereses:</p><ul class="space-y-3">`;
+            top3.forEach((item, index) => {
+                const percentTotal = Math.round((item[1] / totalScore) * 100);
+                const percentMax = Math.round((item[1] / 25) * 100); // Respecto a 25 puntos
+                analysisHTML += `
+                    <li class="${index === 0 ? 'bg-white p-3 rounded border shadow-sm' : 'pl-3 border-l-2'}">
+                        <strong>${index + 1}º. ${item[0]} (${item[1]}/25 pts - ${percentMax}% de afinidad teórica):</strong> 
+                        ${ANALYSIS_DB[item[0]]}
+                    </li>
+                `;
+            });
+            analysisHTML += `</ul>`;
+            document.getElementById('analysis-content').innerHTML = analysisHTML;
+
+            // Detalle en bruto para auditoría del psicólogo
+            document.getElementById('detailed-responses').innerHTML = QUESTIONS.map(q => 
+                `<div class="p-1 border text-center rounded bg-gray-50 flex flex-col justify-center">
+                    <span class="font-bold text-[#8B1D25]">${q.id}${q.type}</span>
+                    <span class="text-gray-700">${state.answers[q.id]}</span>
+                </div>`
+            ).join('');
+            
+            // Gráfico Doughnut
+            new Chart(document.getElementById('resultChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Realista (R)', 'Investigador (I)', 'Artístico (A)', 'Social (S)', 'Emprendedor (E)', 'Convencional (C)'],
+                    datasets: [{ 
+                        data: [scores.R, scores.I, scores.A, scores.S, scores.E, scores.C], 
+                        backgroundColor: ['#8B1D25', '#0D9488', '#EAB308', '#EF4444', '#8B5CF6', '#6B7280'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: { 
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
+                        datalabels: { 
+                            color: '#fff', 
+                            font: { size: 11, weight: 'bold' }, 
+                            formatter: (v, ctx) => v > 0 ? v + 'pt' : '' 
+                        } 
+                    } 
+                },
+                plugins: [ChartDataLabels]
+            });
+        }
+
+        function triggerPrint() {
+            const date = new Date().toISOString().slice(0, 10);
+            document.title = `ReporteVocacional_${state.user.replace(/\s+/g, '_')}_${date}`;
+            window.print();
+        }
+    </script>
+</body>
+</html>
